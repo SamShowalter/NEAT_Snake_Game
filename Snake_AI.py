@@ -1,11 +1,8 @@
 import numpy as np
 import pandas as pd
-import seaborn as sns 
-import matplotlib.pyplot as plt
-import pygame
-from pygame.locals import *
-from Tkinter import * 
+from tkinter import * 
 from segment import Segment
+import os
 from snake import Snake
 import time
 #matplotlib.use("Qt4Agg")
@@ -21,6 +18,9 @@ class SnakeGame(Frame):
 		self.parent = parent
 		self.snake_length = snake_length
 		self.seg_size = seg_size
+		os.chdir("C:\\Users\\sshowalter\\Documents\\My_Documents\\Repos\\NEAT_Snake_Game\\output\\")
+		self.training_data = np.load("neat_train_data.npy").tolist()
+		self.test_data = np.load("neat_test_data.npy").tolist()
 		self.edge_buffer = edge_buffer
 		self.solved = False
 		self.lost = False
@@ -32,6 +32,10 @@ class SnakeGame(Frame):
 
 	def change_coord(self,event):
 		#print(event.keysym)
+		print(event.keysym)
+		if self.snake.direction_opposites[self.snake.direction] == event.keysym:
+			return
+
 		self.snake.direction = event.keysym
 
 
@@ -60,13 +64,71 @@ class SnakeGame(Frame):
 		self.__draw_snake()
 		self.__play_game()
 
-	#Gets manhattan distance of head of the snake from each of the walls
-	def __get_distances(self):
+	def __get_closest_snake(self):
+		self.close_snake_dict = {"Left": np.Inf,
+								 "Right": np.Inf,
+								 "Up":np.Inf,
+								 "Down":np.Inf}
 
-		self.left_dist = (self.snake.body[0].x - self.edge_buffer//2)//self.seg_size
-		self.right_dist = (self.WIDTH - self.edge_buffer - self.snake.body[0].x)//self.seg_size
-		self.top_dist = (self.snake.body[0].y - self.edge_buffer//2)//self.seg_size
-		self.bottom_dist = (self.HEIGHT - self.edge_buffer - self.snake.body[0].y)//self.seg_size
+		head_x = self.snake.body[0].x
+		head_y = self.snake.body[0].y
+		for i in range(1, len(self.snake.body)):
+
+			snake_x = self.snake.body[i].x
+			snake_y = self.snake.body[i].y 
+
+			# For Up and down
+			if (snake_x == head_x):
+				if (snake_y < head_y):
+					self.close_snake_dict["Up"] = min(self.close_snake_dict["Up"], 
+													  (head_y - snake_y)//self.seg_size)
+				else:
+					self.close_snake_dict["Down"] = min(self.close_snake_dict["Down"], 
+													  (snake_y - head_y)//self.seg_size)
+
+			#Left and Right
+			elif (snake_y == head_y):
+				if (snake_x < head_x):
+					self.close_snake_dict["Left"] = min(self.close_snake_dict["Left"], 
+													  (head_x - snake_x)//self.seg_size)
+				else:
+					self.close_snake_dict["Right"] = min(self.close_snake_dict["Right"], 
+													  (snake_x - head_x)//self.seg_size)
+
+			#Make sure snake bits right behind don't freak snake out
+			self.close_snake_dict[self.snake.direction_opposites[self.snake.direction]] = np.Inf
+
+	#Gets manhattan distance of head of the snake from each of the walls
+	def __get_input(self):
+
+		self.__get_closest_snake()
+
+		# Get distances from different walls
+		self.left_wall = (self.snake.body[0].x - self.edge_buffer//2)//self.seg_size
+		self.right_wall = (self.WIDTH - self.edge_buffer - self.snake.body[0].x)//self.seg_size
+		self.top_wall = (self.snake.body[0].y - self.edge_buffer//2)//self.seg_size
+		self.bottom_wall = (self.HEIGHT - self.edge_buffer - self.snake.body[0].y)//self.seg_size
+
+		self.left_danger = float(min(self.close_snake_dict["Left"], self.left_wall))
+		self.right_danger = float(min(self.close_snake_dict["Right"], self.right_wall))
+		self.up_danger = float(min(self.close_snake_dict["Up"], self.top_wall))
+		self.down_danger = float(min(self.close_snake_dict["Down"], self.bottom_wall))
+
+		#Get food distances
+		self.left_food = max((self.snake.body[0].x - self.food.x)//self.seg_size, -1)
+		self.right_food = max((self.food.x - self.snake.body[0].x)//self.seg_size, -1)
+		self.up_food = max((self.snake.body[0].y - self.food.y)//self.seg_size, -1)
+		self.down_food = max((self.food.y - self.snake.body[0].y)//self.seg_size, -1)
+
+		self.input = np.array([self.left_danger,
+								self.right_danger,
+								self.up_danger,
+								self.down_danger,
+								self.left_food,
+								self.right_food,
+								self.up_food,
+								self.down_food])
+		self.training_data.append(self.input)
 
 	def __initialize_snake(self):
 		'''
@@ -172,10 +234,10 @@ class SnakeGame(Frame):
 		return False
 
 	def __draw_distances(self):
-		self.canvas.create_text( 800,60,text = "Distance from left wall: " + str(self.left_dist), tags = "dists", font = ("Arial",13,"bold"))
-		self.canvas.create_text( 800,80,text = "Distance from right wall: " + str(self.right_dist), tags = "dists", font = ("Arial",13,"bold"))
-		self.canvas.create_text( 800,100,text = "Distance from top wall: " + str(self.top_dist), tags = "dists", font = ("Arial",13,"bold"))
-		self.canvas.create_text( 800,120,text = "Distance from bottom wall: " + str(self.bottom_dist), tags = "dists", font = ("Arial",13,"bold"))
+		self.canvas.create_text( 400,60,text = "Distance from left wall: " + str(self.left_dist), tags = "dists", font = ("Arial",13,"bold"))
+		self.canvas.create_text( 400,80,text = "Distance from right wall: " + str(self.right_dist), tags = "dists", font = ("Arial",13,"bold"))
+		self.canvas.create_text( 400,100,text = "Distance from top wall: " + str(self.top_dist), tags = "dists", font = ("Arial",13,"bold"))
+		self.canvas.create_text( 400,120,text = "Distance from bottom wall: " + str(self.bottom_dist), tags = "dists", font = ("Arial",13,"bold"))
 
 
 	def __draw_game(self):
@@ -198,17 +260,23 @@ class SnakeGame(Frame):
 			self.canvas.update()
 			self.canvas.delete("snake")
 			self.canvas.delete("dists")
+			self.__get_input()
+			self.test_data.append(self.snake.int_direction[self.snake.direction])
 			self.snake.move()
-			self.__get_distances()
 			self.__draw_snake()
 			self.__draw_food()
-			self.__draw_distances()
+			#self.__draw_distances()
 			#print("One Iteration")
 			#self.change_coord(event)
 
 			if (self.__outOfBounds() or self.__onBody()):
 				self.lost = True
 				print("Game Over")
+				print(len(self.training_data))
+				os.chdir("C:\\Users\\sshowalter\\Documents\\My_Documents\\Repos\\NEAT_Snake_Game\\output\\")
+				np.save("neat_train_data", self.training_data)
+				np.save("neat_test_data", np.array(self.test_data))
+				print(len(self.test_data))
 				sys.exit(1)
 				return
 
@@ -225,12 +293,22 @@ class SnakeGame(Frame):
 			time.sleep(0.07)
 
 
+
+
 #Run the file
 #Fancy way to have this be imported for other modules too
 if __name__ == '__main__':
 	root = Tk()
-	snake_game = SnakeGame(root, snake_length = 100)
+	snake_game = SnakeGame(root, snake_length = 50)
 
 	root.mainloop()
+	# os.chdir("C:\\Users\\sshowalter\\Documents\\My_Documents\\Repos\\NEAT_Snake_Game\\output\\")
+	# a = np.load("neat_train_data.npy")
+	# b = np.load("neat_test_data.npy")
+
+	# n_values = 4
+	# print(b)
+	# print(np.eye(n_values)[b])
+
 	
 	

@@ -7,6 +7,16 @@ class Snake():
 		self.seg_size = seg_size
 		self.body = []
 
+		self.direction_opposites = {"Up":"Down",
+									"Left":"Right",
+									"Right":"Left",
+									"Down":"Up"}
+
+		self.int_direction = {"Up":0,
+							"Left":3,
+							"Right":2,
+							"Down":1}
+
 	def addSegment(self, segment):
 		self.body.append(segment) 
 
@@ -21,19 +31,15 @@ class Snake():
 		#Print statement for debugging
 		#print(self.body[0].x,self.body[0].y)
 
-		
-
-	def change_direction(self, direction):
-		self.direction = direction
-
 	def move(self):
-		if (self.direction == "Up"):
-			self.move_helper(0,-1)
-		elif (self.direction == "Down"):
+
+		if (self.direction == "Up"):			#UP
+			self.move_helper(0,-1)	
+		elif (self.direction == "Down"):		#DOWN
 			self.move_helper(0,1)
-		elif (self.direction == "Left"):
+		elif (self.direction == "Left"):		#LEFT
 			self.move_helper(-1,0)
-		elif (self.direction == "Right"):
+		elif (self.direction == "Right"):		#RIGHT
 			self.move_helper(1,0)
 
 
